@@ -19,7 +19,7 @@ export default function PatientSOAPNotes({ patientId, records }: { patientId: st
   });
 
   const handleAiReview = async () => {
-    if (!formData.subjective || !formData.objective || !formData.assessment) return;
+    if (!formData.subjective && !formData.objective && !formData.assessment) return;
     setIsAiLoading(true);
     setAiFeedback(null);
     try {
@@ -115,7 +115,7 @@ export default function PatientSOAPNotes({ patientId, records }: { patientId: st
                   <button 
                     type="button"
                     onClick={handleAiReview}
-                    disabled={isAiLoading || !formData.subjective || !formData.objective || !formData.assessment}
+                    disabled={isAiLoading}
                     className="flex items-center text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isAiLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
