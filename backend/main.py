@@ -13,6 +13,10 @@ import datetime
 import stripe
 import asyncio
 from pydantic import BaseModel
+from openai import AsyncOpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123")
 
@@ -234,23 +238,37 @@ class AIFeedbackRequest(BaseModel):
 
 @app.post("/api/ai/assessment-feedback")
 async def get_ai_feedback(request: AIFeedbackRequest):
-    # Simulate network/LLM latency
-    await asyncio.sleep(2.5)
-    
-    # Place your real LLM logic here:
-    # import openai
-    # response = openai.chat.completions.create(...)
-    
-    feedback = f"""
-**AI Clinical Review**
-Based on the Subjective history ({len(request.subjective)} chars) and Objective findings ({len(request.objective)} chars), your Assessment seems reasonable.
+    api_key = os.getenv("DEEPSEEK_API_KEY")
+    if not api_key:
+        return {"feedback": "Error: DEEPSEEK_API_KEY environment variable is not set. Please add it to your .env file."}
 
-*Considerations:*
-- Consider adding specific diagnostic codes.
-- Have you ruled out secondary infections?
-- Ensure the treatment plan addresses the primary symptom reported.
-"""
-    return {"feedback": feedback.strip()}
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url="https://api.deepseek.com"
+    )
+
+    prompt = f"""
+    You are an expert veterinary assistant. Review the following clinical notes:
+    Subjective (History): {request.subjective}
+    Objective (Vitals/Exam): {request.objective}
+    Assessment (Diagnosis): {request.assessment}
+    
+    Provide a brief, professional critique. What differential diagnoses might be missing? Keep the response concise and formatted nicely with bullet points.
+    """
+
+    try:
+        response = await client.chat.completions.create(
+            model="deepseek-chat", # DeepSeek v4 equivalent model identifier
+            messages=[
+                {"role": "system", "content": "You are a helpful and brilliant veterinary clinical assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+        )
+        feedback = response.choices[0].message.content
+        return {"feedback": feedback.strip()}
+    except Exception as e:
+        return {"feedback": f"Failed to connect to DeepSeek: {str(e)}"}
 
 @app.post("/services/")
 def create_service(service: ServiceItem, session: Session = Depends(get_session)):
