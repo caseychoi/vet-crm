@@ -11,6 +11,8 @@ import shutil
 import os
 import datetime
 import stripe
+import asyncio
+from pydantic import BaseModel
 
 stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "sk_test_123")
 
@@ -219,6 +221,36 @@ def restore_patient(patient_id: uuid.UUID, session: Session = Depends(get_sessio
 @app.get("/services/")
 def read_services(session: Session = Depends(get_session)):
     return session.exec(select(ServiceItem).where(ServiceItem.is_active == True)).all()
+
+@app.delete("/settings/services/{service_id}")
+def delete_service(service_id: str, session: Session = Depends(get_session)):
+    pass
+
+# --- AI Assistant ---
+class AIFeedbackRequest(BaseModel):
+    subjective: str
+    objective: str
+    assessment: str
+
+@app.post("/api/ai/assessment-feedback")
+async def get_ai_feedback(request: AIFeedbackRequest):
+    # Simulate network/LLM latency
+    await asyncio.sleep(2.5)
+    
+    # Place your real LLM logic here:
+    # import openai
+    # response = openai.chat.completions.create(...)
+    
+    feedback = f"""
+**AI Clinical Review**
+Based on the Subjective history ({len(request.subjective)} chars) and Objective findings ({len(request.objective)} chars), your Assessment seems reasonable.
+
+*Considerations:*
+- Consider adding specific diagnostic codes.
+- Have you ruled out secondary infections?
+- Ensure the treatment plan addresses the primary symptom reported.
+"""
+    return {"feedback": feedback.strip()}
 
 @app.post("/services/")
 def create_service(service: ServiceItem, session: Session = Depends(get_session)):

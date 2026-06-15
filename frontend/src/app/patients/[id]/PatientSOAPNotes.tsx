@@ -1,12 +1,14 @@
 'use client';
 import React, { useState } from 'react';
-import { Plus, X, Stethoscope } from 'lucide-react';
+import { Plus, X, Stethoscope, Sparkles, Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 export default function PatientSOAPNotes({ patientId, records }: { patientId: string, records: any[] }) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({ 
     patient_id: patientId,
@@ -15,6 +17,27 @@ export default function PatientSOAPNotes({ patientId, records }: { patientId: st
     assessment: '',
     plan: ''
   });
+
+  const handleAiReview = async () => {
+    if (!formData.subjective || !formData.objective || !formData.assessment) return;
+    setIsAiLoading(true);
+    setAiFeedback(null);
+    try {
+      const res = await fetch('http://localhost:8000/api/ai/assessment-feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subjective: formData.subjective, objective: formData.objective, assessment: formData.assessment })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiFeedback(data.feedback);
+      }
+    } catch (e) {
+      console.error(e);
+      setAiFeedback("Failed to connect to AI Assistant.");
+    }
+    setIsAiLoading(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +51,7 @@ export default function PatientSOAPNotes({ patientId, records }: { patientId: st
       if (res.ok) {
         setIsOpen(false);
         setFormData({ patient_id: patientId, subjective: '', objective: '', assessment: '', plan: '' });
+        setAiFeedback(null);
         router.refresh();
       }
     } catch (e) {
@@ -86,8 +110,30 @@ export default function PatientSOAPNotes({ patientId, records }: { patientId: st
                 <textarea required rows={3} value={formData.objective} onChange={e => setFormData({...formData, objective: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Assessment (Diagnosis)</label>
-                <textarea required rows={2} value={formData.assessment} onChange={e => setFormData({...formData, assessment: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-slate-700">Assessment (Diagnosis)</label>
+                  <button 
+                    type="button"
+                    onClick={handleAiReview}
+                    disabled={isAiLoading || !formData.subjective || !formData.objective || !formData.assessment}
+                    className="flex items-center text-xs font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isAiLoading ? <Loader2 className="w-3 h-3 mr-1 animate-spin" /> : <Sparkles className="w-3 h-3 mr-1" />}
+                    AI Review
+                  </button>
+                </div>
+                <textarea required rows={2} value={formData.assessment} onChange={e => setFormData({...formData, assessment: e.target.value})} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                {aiFeedback && (
+                  <div className="mt-3 p-4 bg-indigo-50/50 border border-indigo-100 rounded-lg">
+                    <div className="flex items-center text-indigo-800 font-semibold text-sm mb-2">
+                      <Sparkles className="w-4 h-4 mr-2 text-indigo-500" />
+                      AI Assistant Feedback
+                    </div>
+                    <p className="text-sm text-indigo-900 whitespace-pre-wrap leading-relaxed">
+                      {aiFeedback}
+                    </p>
+                  </div>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Plan (Treatment & Meds)</label>
